@@ -163,7 +163,7 @@ private def computeKzgProofMultiImpl
 /-- Reed-Solomon-extend `blob` and return its cells. -/
 def computeCells (blob : Blob) : IO (Array Cell) := do
   if blob.size ≠ BYTES_PER_BLOB then
-    throw <| IO.userError "compute_cells: bad blob size"
+    throw <| IO.userError "bad blob size"
   let polynomial ← blobToPolynomialIO blob
   let polynomialCoeff := polynomialEvalToCoeff polynomial
   let mut cells : Array Cell := Array.mkEmpty CELLS_PER_EXT_BLOB
@@ -190,7 +190,7 @@ optimal implementations use FK20. -/
 def computeCellsAndKzgProofs
     (blob : Blob) : IO (Array Cell × Array KZGProof) := do
   if blob.size ≠ BYTES_PER_BLOB then
-    throw <| IO.userError "compute_cells_and_kzg_proofs: bad blob size"
+    throw <| IO.userError "bad blob size"
   let polynomial ← blobToPolynomialIO blob
   let polynomialCoeff := polynomialEvalToCoeff polynomial
   computeCellsAndKzgProofsPolynomialcoeff polynomialCoeff
@@ -230,10 +230,10 @@ private def verifyCellKzgProofBatchImpl
   if !( commitmentIndices.size = cellIndices.size
      && cellIndices.size = cosetsEvals.size
      && cosetsEvals.size = proofs.size ) then
-    throw <| IO.userError "verify_cell_kzg_proof_batch_impl: input length mismatch"
+    throw <| IO.userError "input length mismatch"
   for ci in commitmentIndices do
     if ci ≥ commitments.size then
-      throw <| IO.userError "verify_cell_kzg_proof_batch_impl: out-of-bounds commitment index"
+      throw <| IO.userError "out-of-bounds commitment index"
 
   let setup ← TrustedSetup.get!
   let numCells := cellIndices.size
@@ -300,20 +300,20 @@ def verifyCellKzgProofBatch
   if !( commitmentsBytes.size = cells.size
      && cells.size = proofsBytes.size
      && proofsBytes.size = cellIndices.size ) then
-    throw <| IO.userError "verify_cell_kzg_proof_batch: input length mismatch"
+    throw <| IO.userError "input length mismatch"
 
   for cb in commitmentsBytes do
     if cb.size ≠ BYTES_PER_COMMITMENT then
-      throw <| IO.userError "verify_cell_kzg_proof_batch: bad commitment size"
+      throw <| IO.userError "bad commitment size"
   for ci in cellIndices do
     if ci ≥ CELLS_PER_EXT_BLOB then
-      throw <| IO.userError "verify_cell_kzg_proof_batch: cell index out of bounds"
+      throw <| IO.userError "cell index out of bounds"
   for c in cells do
     if c.size ≠ BYTES_PER_CELL then
-      throw <| IO.userError "verify_cell_kzg_proof_batch: bad cell size"
+      throw <| IO.userError "bad cell size"
   for pb in proofsBytes do
     if pb.size ≠ BYTES_PER_PROOF then
-      throw <| IO.userError "verify_cell_kzg_proof_batch: bad proof size"
+      throw <| IO.userError "bad proof size"
 
   -- Deduplicate commitments while preserving the index of first occurrence.
   let mut deduped : Array KZGCommitment := Array.empty
@@ -322,7 +322,7 @@ def verifyCellKzgProofBatch
     -- Validate (also acts as `bytes_to_kzg_commitment`).
     let _ ← match bytesToKzgCommitment cb with
             | some c => pure c
-            | none   => throw <| IO.userError "verify_cell_kzg_proof_batch: invalid commitment"
+            | none   => throw <| IO.userError "invalid commitment"
     -- Find or append. We use a simple linear scan; the input list of
     -- commitments tends to be short relative to the cell list.
     let mut found : Option Nat := none
@@ -341,14 +341,14 @@ def verifyCellKzgProofBatch
   for c in cells do
     match cellToCosetEvals c with
     | some evals => cosetsEvals := cosetsEvals.push evals
-    | none       => throw <| IO.userError "verify_cell_kzg_proof_batch: invalid cell field element"
+    | none       => throw <| IO.userError "invalid cell field element"
 
   -- Validate proofs.
   let mut proofs : Array KZGProof := Array.mkEmpty proofsBytes.size
   for pb in proofsBytes do
     match bytesToKzgProof pb with
     | some p => proofs := proofs.push p
-    | none   => throw <| IO.userError "verify_cell_kzg_proof_batch: invalid proof"
+    | none   => throw <| IO.userError "invalid proof"
 
   verifyCellKzgProofBatchImpl deduped commitmentIndices cellIndices cosetsEvals proofs
 

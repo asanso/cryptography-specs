@@ -93,31 +93,31 @@ def recoverCellsAndKzgProofs
     (cellIndices : Array CellIndex) (cells : Array Cell)
     : IO (Array Cell × Array KZGProof) := do
   if cellIndices.size ≠ cells.size then
-    throw <| IO.userError "recover_cells_and_kzg_proofs: cell_indices/cells length mismatch"
+    throw <| IO.userError "cell_indices/cells length mismatch"
   if !(CELLS_PER_EXT_BLOB / 2 ≤ cellIndices.size && cellIndices.size ≤ CELLS_PER_EXT_BLOB) then
-    throw <| IO.userError "recover_cells_and_kzg_proofs: need 50%-100% of cells"
+    throw <| IO.userError "need 50%-100% of cells"
 
   -- Strictly ascending (which also implies uniqueness).
   let mut prev : Option CellIndex := none
   for ci in cellIndices do
     match prev with
     | some p => if ci ≤ p then
-                  throw <| IO.userError "recover_cells_and_kzg_proofs: indices not strictly ascending"
+                  throw <| IO.userError "indices not strictly ascending"
     | none   => pure ()
     prev := some ci
     if ci ≥ CELLS_PER_EXT_BLOB then
-      throw <| IO.userError "recover_cells_and_kzg_proofs: cell index out of bounds"
+      throw <| IO.userError "cell index out of bounds"
 
   for c in cells do
     if c.size ≠ BYTES_PER_CELL then
-      throw <| IO.userError "recover_cells_and_kzg_proofs: bad cell size"
+      throw <| IO.userError "bad cell size"
 
   -- Convert cells to coset evaluations.
   let mut cosetsEvals : Array CosetEvals := Array.mkEmpty cells.size
   for c in cells do
     match cellToCosetEvals c with
     | some evals => cosetsEvals := cosetsEvals.push evals
-    | none       => throw <| IO.userError "recover_cells_and_kzg_proofs: invalid field element in cell"
+    | none       => throw <| IO.userError "invalid field element in cell"
 
   let polyCoeff := recoverPolynomialcoeff cellIndices cosetsEvals
   computeCellsAndKzgProofsPolynomialcoeff polyCoeff

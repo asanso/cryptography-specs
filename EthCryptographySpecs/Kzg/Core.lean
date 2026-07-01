@@ -110,13 +110,13 @@ Returns `(proof, y_bytes)`, where `y_bytes` is the 32-byte big-endian
 encoding of `p(z)`. -/
 def computeKzgProof (blob : Blob) (zBytes : Bytes32) : IO (KZGProof × Bytes32) := do
   if blob.size ≠ BYTES_PER_BLOB then
-    throw <| IO.userError s!"compute_kzg_proof: bad blob size {blob.size}"
+    throw <| IO.userError s!"bad blob size {blob.size}"
   if zBytes.size ≠ BYTES_PER_FIELD_ELEMENT then
-    throw <| IO.userError s!"compute_kzg_proof: bad z size {zBytes.size}"
+    throw <| IO.userError s!"bad z size {zBytes.size}"
   let polynomial ← blobToPolynomialIO blob
   let z ← match bytesToBlsField zBytes with
           | some f => pure f
-          | none   => throw <| IO.userError "compute_kzg_proof: invalid z"
+          | none   => throw <| IO.userError "invalid z"
   let (proof, y) ← computeKzgProofImpl polynomial z
   return (proof, blsFieldToBytes y)
 
@@ -142,25 +142,25 @@ def verifyKzgProof
     (commitmentBytes : Bytes48) (zBytes yBytes : Bytes32) (proofBytes : Bytes48)
     : IO Bool := do
   if commitmentBytes.size ≠ BYTES_PER_COMMITMENT then
-    throw <| IO.userError "verify_kzg_proof: bad commitment size"
+    throw <| IO.userError "bad commitment size"
   if zBytes.size ≠ BYTES_PER_FIELD_ELEMENT then
-    throw <| IO.userError "verify_kzg_proof: bad z size"
+    throw <| IO.userError "bad z size"
   if yBytes.size ≠ BYTES_PER_FIELD_ELEMENT then
-    throw <| IO.userError "verify_kzg_proof: bad y size"
+    throw <| IO.userError "bad y size"
   if proofBytes.size ≠ BYTES_PER_PROOF then
-    throw <| IO.userError "verify_kzg_proof: bad proof size"
+    throw <| IO.userError "bad proof size"
   let commitment ← match bytesToKzgCommitment commitmentBytes with
                    | some c => pure c
-                   | none   => throw <| IO.userError "verify_kzg_proof: invalid commitment"
+                   | none   => throw <| IO.userError "invalid commitment"
   let proof ← match bytesToKzgProof proofBytes with
               | some p => pure p
-              | none   => throw <| IO.userError "verify_kzg_proof: invalid proof"
+              | none   => throw <| IO.userError "invalid proof"
   let z ← match bytesToBlsField zBytes with
           | some f => pure f
-          | none   => throw <| IO.userError "verify_kzg_proof: invalid z"
+          | none   => throw <| IO.userError "invalid z"
   let y ← match bytesToBlsField yBytes with
           | some f => pure f
-          | none   => throw <| IO.userError "verify_kzg_proof: invalid y"
+          | none   => throw <| IO.userError "invalid y"
   verifyKzgProofImpl commitment z y proof
 
 /-- Verify multiple KZG proofs efficiently using a random linear combination. -/
@@ -169,7 +169,7 @@ private def verifyKzgProofBatch
     (zs ys : Array Fr)
     (proofs : Array KZGProof) : IO Bool := do
   if !(commitments.size = zs.size && zs.size = ys.size && ys.size = proofs.size) then
-    throw <| IO.userError "verify_kzg_proof_batch: input size mismatch"
+    throw <| IO.userError "input size mismatch"
   let setup ← TrustedSetup.get!
 
   -- Random challenge: deterministic via Fiat-Shamir.
@@ -206,7 +206,7 @@ private def verifyKzgProofBatch
 /-- Compute a KZG commitment from a blob. -/
 def blobToKzgCommitment (blob : Blob) : IO KZGCommitment := do
   if blob.size ≠ BYTES_PER_BLOB then
-    throw <| IO.userError s!"blob_to_kzg_commitment: bad blob size {blob.size}"
+    throw <| IO.userError s!"bad blob size {blob.size}"
   let setup ← TrustedSetup.get!
   let polynomial ← blobToPolynomialIO blob
   let lagrangeBrp := bitReversalPermutation setup.g1LagrangeBytes
@@ -216,12 +216,12 @@ def blobToKzgCommitment (blob : Blob) : IO KZGCommitment := do
 not check that `commitment` is correct for `blob`. -/
 def computeBlobKzgProof (blob : Blob) (commitmentBytes : Bytes48) : IO KZGProof := do
   if blob.size ≠ BYTES_PER_BLOB then
-    throw <| IO.userError "compute_blob_kzg_proof: bad blob size"
+    throw <| IO.userError "bad blob size"
   if commitmentBytes.size ≠ BYTES_PER_COMMITMENT then
-    throw <| IO.userError "compute_blob_kzg_proof: bad commitment size"
+    throw <| IO.userError "bad commitment size"
   let commitment ← match bytesToKzgCommitment commitmentBytes with
                    | some c => pure c
-                   | none   => throw <| IO.userError "compute_blob_kzg_proof: invalid commitment"
+                   | none   => throw <| IO.userError "invalid commitment"
   let polynomial ← blobToPolynomialIO blob
   let evaluationChallenge := computeChallenge blob commitment
   let (proof, _) ← computeKzgProofImpl polynomial evaluationChallenge
@@ -232,20 +232,20 @@ def verifyBlobKzgProof
     (blob : Blob) (commitmentBytes : Bytes48) (proofBytes : Bytes48)
     : IO Bool := do
   if blob.size ≠ BYTES_PER_BLOB then
-    throw <| IO.userError "verify_blob_kzg_proof: bad blob size"
+    throw <| IO.userError "bad blob size"
   if commitmentBytes.size ≠ BYTES_PER_COMMITMENT then
-    throw <| IO.userError "verify_blob_kzg_proof: bad commitment size"
+    throw <| IO.userError "bad commitment size"
   if proofBytes.size ≠ BYTES_PER_PROOF then
-    throw <| IO.userError "verify_blob_kzg_proof: bad proof size"
+    throw <| IO.userError "bad proof size"
   let commitment ← match bytesToKzgCommitment commitmentBytes with
                    | some c => pure c
-                   | none   => throw <| IO.userError "verify_blob_kzg_proof: invalid commitment"
+                   | none   => throw <| IO.userError "invalid commitment"
   let polynomial ← blobToPolynomialIO blob
   let evaluationChallenge := computeChallenge blob commitment
   let y := evaluatePolynomialInEvaluationForm polynomial evaluationChallenge
   let proof ← match bytesToKzgProof proofBytes with
               | some p => pure p
-              | none   => throw <| IO.userError "verify_blob_kzg_proof: invalid proof"
+              | none   => throw <| IO.userError "invalid proof"
   verifyKzgProofImpl commitment evaluationChallenge y proof
 
 /-- Verify a batch of (blob, commitment, proof) triples. Returns `true`
@@ -255,7 +255,7 @@ def verifyBlobKzgProofBatch
     (commitmentsBytes : Array Bytes48)
     (proofsBytes : Array Bytes48) : IO Bool := do
   if !(blobs.size = commitmentsBytes.size && commitmentsBytes.size = proofsBytes.size) then
-    throw <| IO.userError "verify_blob_kzg_proof_batch: input size mismatch"
+    throw <| IO.userError "input size mismatch"
 
   let mut commitments    : Array KZGCommitment   := Array.mkEmpty blobs.size
   let mut challenges     : Array Fr := Array.mkEmpty blobs.size
@@ -267,18 +267,18 @@ def verifyBlobKzgProofBatch
     let cb := commitmentsBytes[i]!
     let pb := proofsBytes[i]!
     if blob.size ≠ BYTES_PER_BLOB then
-      throw <| IO.userError "verify_blob_kzg_proof_batch: bad blob size"
+      throw <| IO.userError "bad blob size"
     if cb.size ≠ BYTES_PER_COMMITMENT then
-      throw <| IO.userError "verify_blob_kzg_proof_batch: bad commitment size"
+      throw <| IO.userError "bad commitment size"
     if pb.size ≠ BYTES_PER_PROOF then
-      throw <| IO.userError "verify_blob_kzg_proof_batch: bad proof size"
+      throw <| IO.userError "bad proof size"
 
     let commitment ← match bytesToKzgCommitment cb with
                      | some c => pure c
-                     | none   => throw <| IO.userError "verify_blob_kzg_proof_batch: invalid commitment"
+                     | none   => throw <| IO.userError "invalid commitment"
     let proof ← match bytesToKzgProof pb with
                 | some p => pure p
-                | none   => throw <| IO.userError "verify_blob_kzg_proof_batch: invalid proof"
+                | none   => throw <| IO.userError "invalid proof"
 
     let polynomial ← blobToPolynomialIO blob
     let challenge := computeChallenge blob commitment

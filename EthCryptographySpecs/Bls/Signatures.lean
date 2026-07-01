@@ -68,15 +68,15 @@ def fastAggregateVerify
 Throws on an empty list or any invalid pubkey. -/
 def ethAggregatePubkeys (pubkeys : Array ByteArray) : IO ByteArray := do
   if pubkeys.isEmpty then
-    throw <| IO.userError "eth_aggregate_pubkeys: empty pubkey list"
+    throw <| IO.userError "empty pubkey list"
   let mut agg : G1 := G1.zero
   for pk in pubkeys do
     if pk.size ≠ 48 then
-      throw <| IO.userError "eth_aggregate_pubkeys: bad pubkey size"
+      throw <| IO.userError "bad pubkey size"
     if !G1.keyValidate pk then
-      throw <| IO.userError "eth_aggregate_pubkeys: invalid pubkey"
+      throw <| IO.userError "invalid pubkey"
     match G1.uncompress pk with
-    | none => throw <| IO.userError "eth_aggregate_pubkeys: pubkey decompression failed"
+    | none => throw <| IO.userError "pubkey decompression failed"
     | some p => agg := G1.add agg p
   return G1.compress agg
 
