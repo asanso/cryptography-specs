@@ -92,22 +92,30 @@ private def recoverPolynomialcoeff
 def recoverCellsAndKzgProofs
     (cellIndices : Array CellIndex) (cells : Array Cell)
     : IO (Array Cell × Array KZGProof) := do
+
+  -- There must be an equal number of cells and indices.
   if cellIndices.size ≠ cells.size then
     throw <| IO.userError "cell_indices/cells length mismatch"
-  if !(CELLS_PER_EXT_BLOB / 2 ≤ cellIndices.size && cellIndices.size ≤ CELLS_PER_EXT_BLOB) then
-    throw <| IO.userError "need 50%-100% of cells"
 
-  -- Strictly ascending (which also implies uniqueness).
-  let mut prev : Option CellIndex := none
+  -- At least 50% of cells must be provided.
+  if cellIndices.size < CELLS_PER_EXT_BLOB / 2 then
+    throw <| IO.userError "not enough cells provided"
+
+  -- There must not be more cells than can exist in a single blob.
+  if cellIndices.size > CELLS_PER_EXT_BLOB then
+    throw <| IO.userError "too many cells provided"
+
+  -- Cell indices must be within bounds.
   for ci in cellIndices do
-    match prev with
-    | some p => if ci ≤ p then
-                  throw <| IO.userError "indices not strictly ascending"
-    | none   => pure ()
-    prev := some ci
     if ci ≥ CELLS_PER_EXT_BLOB then
       throw <| IO.userError "cell index out of bounds"
 
+  -- Cell indices must be strictly ascending.
+  for i in [1:cellIndices.size] do
+    if cellIndices[i]! ≤ cellIndices[i-1]! then
+      throw <| IO.userError "indices not strictly ascending"
+
+  -- Cells must be the correct size.
   for c in cells do
     if c.size ≠ BYTES_PER_CELL then
       throw <| IO.userError "bad cell size"
