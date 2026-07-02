@@ -22,3 +22,7 @@ package «EthCryptographySpecs» where
 @[default_target]
 lean_lib «EthCryptographySpecs» where
   precompileModules := true
+  leanOptions := #[
+    ⟨`linter.all, true⟩,
+    ⟨`linter.missingDocs, false⟩
+  ]
