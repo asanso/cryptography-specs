@@ -34,8 +34,9 @@ inductive KzgError where
   | invalidProof (index : Option Nat)
   /-- A field element was not canonical. -/
   | invalidFieldElement (index : Option Nat)
-  /-- Input arrays had mismatched lengths. -/
-  | inputLengthMismatch
+  /-- An input array (`input`, named after the parameter) did not have
+  the same length as the input array it must match. -/
+  | inputLengthMismatch (input : String) (expected actual : Nat)
   /-- A G1 linear combination got different point and scalar counts. -/
   | lincombLengthMismatch (points scalars : Nat)
   /-- A commitment index referenced a commitment that does not exist. -/
@@ -62,7 +63,8 @@ def KzgError.message : KzgError → String
   | .invalidProof none              => "invalid proof"
   | .invalidFieldElement (some index) => s!"invalid field element at index {index}"
   | .invalidFieldElement none         => "invalid field element"
-  | .inputLengthMismatch        => "input length mismatch"
+  | .inputLengthMismatch input expected actual =>
+      s!"input length mismatch: {input} has length {actual}, expected {expected}"
   | .lincombLengthMismatch points scalars =>
       s!"linear combination length mismatch: {points} points, {scalars} scalars"
   | .commitmentIndexOutOfBounds => "out-of-bounds commitment index"

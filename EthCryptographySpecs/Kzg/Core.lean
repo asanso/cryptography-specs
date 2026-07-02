@@ -33,7 +33,7 @@ abbrev KZGProof      := ByteArray
 /-! ## Validation -/
 
 /-- BLS validation, allowing the point at infinity. -/
-private def validateKzgG1 (b : Bytes48) : Bool :=
+def validateKzgG1 (b : Bytes48) : Bool :=
   if b == G1_POINT_AT_INFINITY then true
   else (Bls.G1.keyValidate b).isOk
 
@@ -65,18 +65,17 @@ def g1Lincomb
 handling the special case where `z` is in the roots of unity. -/
 private def computeQuotientEvalWithinDomain
     (z : Fr) (polynomial : Polynomial) (y : Fr)
-    : Fr := Id.run do
+    : Fr :=
   let domain := rootsOfUnityBrp FIELD_ELEMENTS_PER_BLOB
-  let mut result : Fr := Fr.zero
-  for i in [:domain.size] do
+  (Array.range domain.size).foldl (init := Fr.zero) fun result i =>
     let omega_i := domain[i]!
     if omega_i == z then
-      continue
-    let f_i := polynomial[i]! - y
-    let numerator := f_i * omega_i
-    let denominator := z * (z - omega_i)
-    result := result + (numerator / denominator)
-  return result
+      result
+    else
+      let f_i := polynomial[i]! - y
+      let numerator := f_i * omega_i
+      let denominator := z * (z - omega_i)
+      result + (numerator / denominator)
 
 /-- Returns the KZG proof at `z` and the evaluation `y = p(z)`. -/
 private def computeKzgProofImpl
@@ -93,17 +92,14 @@ private def computeKzgProofImpl
   let denominatorPoly := domain.map (· - z)
 
   -- Quotient polynomial directly in evaluation form.
-  let quotient : Array Fr := Id.run do
-    let mut q : Array Fr := Array.mkEmpty FIELD_ELEMENTS_PER_BLOB
-    for i in [:FIELD_ELEMENTS_PER_BLOB] do
-      let a := polynomialShifted[i]!
-      let b := denominatorPoly[i]!
-      if b.isZero then
-        -- z lands on a root of unity; use the special-case formula.
-        q := q.push (computeQuotientEvalWithinDomain domain[i]! polynomial y)
-      else
-        q := q.push (a / b)
-    return q
+  let quotient : Array Fr := Array.ofFn (n := FIELD_ELEMENTS_PER_BLOB) fun i =>
+    let a := polynomialShifted[i.val]!
+    let b := denominatorPoly[i.val]!
+    if b.isZero then
+      -- z lands on a root of unity; use the special-case formula.
+      computeQuotientEvalWithinDomain domain[i.val]! polynomial y
+    else
+      a / b
 
   let proof ← g1Lincomb g1LagrangeBrp quotient
   return (proof, y)
@@ -161,16 +157,24 @@ private def verifyKzgProofBatch
     (commitments : Array KZGCommitment)
     (zs ys : Array Fr)
     (proofs : Array KZGProof) : KzgM Bool := do
-  if !(commitments.size = zs.size && zs.size = ys.size && ys.size = proofs.size) then
-    throw .inputLengthMismatch
+  if zs.size ≠ commitments.size then
+    throw (.inputLengthMismatch "zs" commitments.size zs.size)
+  if ys.size ≠ commitments.size then
+    throw (.inputLengthMismatch "ys" commitments.size ys.size)
+  if proofs.size ≠ commitments.size then
+    throw (.inputLengthMismatch "proofs" commitments.size proofs.size)
   let setup ← TrustedSetup.get!
 
   -- Random challenge: deterministic via Fiat-Shamir.
   let degreePoly := intToBytesBE FIELD_ELEMENTS_PER_BLOB 8
   let numCommitments := intToBytesBE commitments.size 8
-  let mut data := RANDOM_CHALLENGE_KZG_BATCH_DOMAIN ++ degreePoly ++ numCommitments
-  for i in [:commitments.size] do
-    data := data ++ commitments[i]! ++ blsFieldToBytes zs[i]! ++ blsFieldToBytes ys[i]! ++ proofs[i]!
+  let data := (Array.range commitments.size).foldl
+    (init := RANDOM_CHALLENGE_KZG_BATCH_DOMAIN ++ degreePoly ++ numCommitments)
+    fun data i => data
+        ++ commitments[i]!
+        ++ blsFieldToBytes zs[i]!
+        ++ blsFieldToBytes ys[i]!
+        ++ proofs[i]!
   let r := hashToBlsField data
   let rPowers := computePowers r commitments.size
 
@@ -241,40 +245,39 @@ def verifyBlobKzgProofBatch
     (blobs : Array Blob)
     (commitmentsBytes : Array Bytes48)
     (proofsBytes : Array Bytes48) : KzgM Bool := do
-  if !(blobs.size = commitmentsBytes.size && commitmentsBytes.size = proofsBytes.size) then
-    throw .inputLengthMismatch
+  if commitmentsBytes.size ≠ blobs.size then
+    throw (.inputLengthMismatch "commitmentsBytes" blobs.size commitmentsBytes.size)
+  if proofsBytes.size ≠ blobs.size then
+    throw (.inputLengthMismatch "proofsBytes" blobs.size proofsBytes.size)
 
-  let mut commitments    : Array KZGCommitment   := Array.mkEmpty blobs.size
-  let mut challenges     : Array Fr := Array.mkEmpty blobs.size
-  let mut ys             : Array Fr := Array.mkEmpty blobs.size
-  let mut proofs         : Array KZGProof        := Array.mkEmpty blobs.size
+  let (commitments, challenges, ys, proofs) ←
+    (Array.range blobs.size).foldlM
+      (init := ((#[] : Array KZGCommitment), (#[] : Array Fr),
+                (#[] : Array Fr), (#[] : Array KZGProof)))
+      fun (commitments, challenges, ys, proofs) i => do
+        let blob := blobs[i]!
+        let cb := commitmentsBytes[i]!
+        let pb := proofsBytes[i]!
+        if blob.size ≠ BYTES_PER_BLOB then
+          throw (.badBlobSize blob.size)
+        if cb.size ≠ BYTES_PER_COMMITMENT then
+          throw (.badCommitmentSize cb.size)
+        if pb.size ≠ BYTES_PER_PROOF then
+          throw (.badProofSize pb.size)
 
-  for i in [:blobs.size] do
-    let blob := blobs[i]!
-    let cb := commitmentsBytes[i]!
-    let pb := proofsBytes[i]!
-    if blob.size ≠ BYTES_PER_BLOB then
-      throw (.badBlobSize blob.size)
-    if cb.size ≠ BYTES_PER_COMMITMENT then
-      throw (.badCommitmentSize cb.size)
-    if pb.size ≠ BYTES_PER_PROOF then
-      throw (.badProofSize pb.size)
+        let commitment ← match bytesToKzgCommitment cb with
+                         | .ok c    => pure c
+                         | .error _ => throw (.invalidCommitment (some i))
+        let proof ← match bytesToKzgProof pb with
+                    | .ok p    => pure p
+                    | .error _ => throw (.invalidProof (some i))
 
-    let commitment ← match bytesToKzgCommitment cb with
-                     | .ok c    => pure c
-                     | .error _ => throw (.invalidCommitment (some i))
-    let proof ← match bytesToKzgProof pb with
-                | .ok p    => pure p
-                | .error _ => throw (.invalidProof (some i))
+        let polynomial ← blobToPolynomial blob
+        let challenge := computeChallenge blob commitment
+        let y := evaluatePolynomialInEvaluationForm polynomial challenge
 
-    let polynomial ← blobToPolynomial blob
-    let challenge := computeChallenge blob commitment
-    let y := evaluatePolynomialInEvaluationForm polynomial challenge
-
-    commitments := commitments.push commitment
-    challenges  := challenges.push challenge
-    ys          := ys.push y
-    proofs      := proofs.push proof
+        pure (commitments.push commitment, challenges.push challenge,
+              ys.push y, proofs.push proof)
 
   verifyKzgProofBatch commitments challenges ys proofs
 

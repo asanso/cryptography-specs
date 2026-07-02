@@ -13,6 +13,12 @@ unconditionally.
 
 namespace EthCryptographySpecs.Bls.Fr
 
+protected theorem modulus_pos : 0 < modulus := by decide
+
+/-- `ofNat` always produces a canonical value. -/
+theorem val_ofNat_lt (n : Nat) : (ofNat n).val < modulus :=
+  Nat.mod_lt n Fr.modulus_pos
+
 protected theorem mul_comm (a b : Fr) : a * b = b * a := by
   show Fr.mk _ = Fr.mk _
   rw [Nat.mul_comm]

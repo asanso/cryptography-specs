@@ -95,8 +95,8 @@ def recoverCellsAndKzgProofs
     : KzgM (Array Cell × Array KZGProof) := do
 
   -- There must be an equal number of cells and indices.
-  if cellIndices.size ≠ cells.size then
-    throw .inputLengthMismatch
+  if cells.size ≠ cellIndices.size then
+    throw (.inputLengthMismatch "cells" cellIndices.size cells.size)
 
   -- At least 50% of cells must be provided.
   if cellIndices.size < CELLS_PER_EXT_BLOB / 2 then

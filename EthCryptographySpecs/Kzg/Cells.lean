@@ -230,10 +230,12 @@ private def verifyCellKzgProofBatchImpl
     (cosetsEvals : Array CosetEvals)
     (proofs : Array KZGProof) : KzgM Bool := do
   -- Length and bounds checks.
-  if !( commitmentIndices.size = cellIndices.size
-     && cellIndices.size = cosetsEvals.size
-     && cosetsEvals.size = proofs.size ) then
-    throw .inputLengthMismatch
+  if cellIndices.size ≠ commitmentIndices.size then
+    throw (.inputLengthMismatch "cellIndices" commitmentIndices.size cellIndices.size)
+  if cosetsEvals.size ≠ commitmentIndices.size then
+    throw (.inputLengthMismatch "cosetsEvals" commitmentIndices.size cosetsEvals.size)
+  if proofs.size ≠ commitmentIndices.size then
+    throw (.inputLengthMismatch "proofs" commitmentIndices.size proofs.size)
   for ci in commitmentIndices do
     if ci ≥ commitments.size then
       throw .commitmentIndexOutOfBounds
@@ -300,10 +302,12 @@ def verifyCellKzgProofBatch
     (cells : Array Cell)
     (proofsBytes : Array Bytes48) : KzgM Bool := do
 
-  if !( commitmentsBytes.size = cells.size
-     && cells.size = proofsBytes.size
-     && proofsBytes.size = cellIndices.size ) then
-    throw .inputLengthMismatch
+  if cells.size ≠ commitmentsBytes.size then
+    throw (.inputLengthMismatch "cells" commitmentsBytes.size cells.size)
+  if proofsBytes.size ≠ commitmentsBytes.size then
+    throw (.inputLengthMismatch "proofsBytes" commitmentsBytes.size proofsBytes.size)
+  if cellIndices.size ≠ commitmentsBytes.size then
+    throw (.inputLengthMismatch "cellIndices" commitmentsBytes.size cellIndices.size)
 
   for cb in commitmentsBytes do
     if cb.size ≠ BYTES_PER_COMMITMENT then
