@@ -1,11 +1,12 @@
 """
 Build the `eth_cryptography_specs._native` CPython extension.
 
-Strategy: produce a single self-contained `.so` by statically linking
-every Lean-generated `.c.o.export` object alongside the static archives
-shipped with the active Lean toolchain (libleanrt, libInit, libStd,
-libleancpp, libgmp, libuv). The resulting extension has no runtime
-dependency on the Lean toolchain — it only needs libc and libc++.
+Strategy: compile every Lean-generated `.c.o.export` object into the
+extension, dynamically link against Lean's `libleanshared`, and statically
+link the small native dependencies available in the active Lean toolchain
+(currently libgmp and libuv when present). Wheel repair tools bundle the
+Lean shared library for distribution, while local source builds find it via
+the runtime library path configured below.
 
 The build runs `lake build` first to (re-)generate the Lean object
 files, then hands the full list to setuptools.Extension.
