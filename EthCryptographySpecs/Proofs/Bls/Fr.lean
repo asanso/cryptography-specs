@@ -78,6 +78,7 @@ def powNatModel (a : Fr) : Nat → Fr
   | 0 => one
   | e + 1 => a * powNatModel a e
 
+
 private theorem powNatModel_sq (a : Fr) (k : Nat) :
     powNatModel (a * a) k = powNatModel a (2 * k) := by
   induction k with
@@ -124,5 +125,42 @@ theorem fromBytesBE_ok {b : ByteArray} {f : Fr}
       cases h
       exact ⟨by omega, rfl, hlt⟩
     · cases h
+
+/-- `powNat` always produces a canonical value. -/
+protected theorem powNat_val_lt (a : Fr) (e : Nat) :
+    (powNat a e).val < modulus := by
+  rw [powNat_eq_powNatModel]
+  induction e with
+  | zero =>
+    show (Fr.one).val < modulus
+    decide
+  | succ n _ =>
+    show (a * powNatModel a n).val < modulus
+    exact Nat.mod_lt _ Fr.modulus_pos
+
+/-- Absorbing a trailing `* one` into a `powNat`: unconditional because
+`powNat a e` is always canonical. -/
+private theorem powNat_mul_one (a : Fr) (e : Nat) :
+    powNat a e * Fr.one = powNat a e := by
+  show Fr.mk ((powNat a e).val * 1 % modulus) = powNat a e
+  rw [Nat.mul_one, Nat.mod_eq_of_lt (Fr.powNat_val_lt a e)]
+
+/-- `a^(m + n) = a^m * a^n`. -/
+theorem powNat_add (a : Fr) (m n : Nat) :
+    powNat a (m + n) = powNat a m * powNat a n := by
+  induction n with
+  | zero => rw [Nat.add_zero, powNat_zero, powNat_mul_one]
+  | succ n ih =>
+    rw [show m + (n + 1) = (m + n) + 1 from by omega,
+        powNat_succ, powNat_succ, ih,
+        ← Fr.mul_assoc, Fr.mul_comm a (powNat a m), Fr.mul_assoc]
+
+/-- `a^(m * n) = (a^m)^n`. -/
+theorem powNat_mul (a : Fr) (m n : Nat) :
+    powNat a (m * n) = powNat (powNat a m) n := by
+  induction n with
+  | zero => rw [Nat.mul_zero, powNat_zero, powNat_zero]
+  | succ n ih =>
+    rw [Nat.mul_succ, powNat_add, ih, powNat_succ, Fr.mul_comm]
 
 end EthCryptographySpecs.Bls.Fr
