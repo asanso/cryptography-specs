@@ -1,5 +1,4 @@
 import EthCryptographySpecs.Bls
-import EthCryptographySpecs.Kzg.Polynomials
 import EthCryptographySpecs.Kzg.Constants
 
 /-!

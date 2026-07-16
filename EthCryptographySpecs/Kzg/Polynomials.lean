@@ -2,6 +2,7 @@ import EthCryptographySpecs.Bls
 import EthCryptographySpecs.Kzg.Constants
 import EthCryptographySpecs.Kzg.BitReversal
 import EthCryptographySpecs.Kzg.Errors
+import EthCryptographySpecs.Kzg.Fft
 
 /-!
 # `Polynomials`
@@ -88,6 +89,78 @@ def computeRootsOfUnity (order : Nat) : Array Fr :=
   let root :=
     (Fr.ofNat PRIMITIVE_ROOT_OF_UNITY) ^ (Fr.ofNat exponent)
   computePowers root order
+
+/-! ## Polynomials in coefficient form -/
+
+/-- Sum the coefficient-form polynomials `a` and `b`. -/
+def addPolynomialcoeff (a b : PolynomialCoeff) : PolynomialCoeff :=
+  let (a, b) := if a.size ≥ b.size then (a, b) else (b, a)
+  Array.ofFn (n := a.size) fun i =>
+    let bi := if i.val < b.size then b[i.val]! else Fr.zero
+    a[i.val]! + bi
+
+/-- Multiply the coefficient-form polynomials `a` and `b`. -/
+def multiplyPolynomialcoeff (a b : PolynomialCoeff) : PolynomialCoeff :=
+  -- Caller must ensure `len(a) + len(b) ≤ FIELD_ELEMENTS_PER_EXT_BLOB`.
+  (Array.range a.size).foldl (init := #[Fr.zero]) fun r power =>
+    let coef := a[power]!
+    let summand : PolynomialCoeff :=
+      Array.replicate power Fr.zero ++ b.map (· * coef)
+    addPolynomialcoeff r summand
+
+/-- Long polynomial division for two coefficient-form polynomials.
+Each step eliminates the current leading coefficient of `a` (at index
+`apos`, descending) and prepends the quotient coefficient to `o`. -/
+def dividePolynomialcoeff (a b : PolynomialCoeff) : PolynomialCoeff :=
+  let bpos := b.size - 1
+  -- The divisor's leading coefficient is loop-invariant; precompute its
+  -- inverse once instead of paying for a full Fermat exponentiation
+  -- (~570 Fp muls) on every outer iteration.
+  let bLeadInv := b[bpos]!.inverse
+  -- One quotient coefficient per step, while `apos - t ≥ bpos`.
+  let steps := a.size + 1 - max b.size 1
+  let (_, o) := (Array.range steps).foldl
+    (init := (a, (Array.empty : PolynomialCoeff)))
+    fun (a, o) t =>
+      let apos := a.size - 1 - t
+      let diff := apos - bpos
+      let quot := a[apos]! * bLeadInv
+      let a := (Array.range b.size).foldl
+        (fun a i => a.set! (diff + i) (a[diff + i]! - b[i]! * quot)) a
+      (a, #[quot] ++ o)
+  o
+
+/-- Lagrange interpolation in coefficient form. Leading coefficients
+may be zero. -/
+def interpolatePolynomialcoeff
+    (xs ys : Array Fr) : PolynomialCoeff :=
+  (Array.range xs.size).foldl (init := #[Fr.zero]) fun r i =>
+    let summand := (Array.range ys.size).foldl (init := #[ys[i]!])
+      fun summand j =>
+        if j ≠ i then
+          let weightAdj := (xs[i]! - xs[j]!).inverse
+          multiplyPolynomialcoeff summand #[(-weightAdj) * xs[j]!, weightAdj]
+        else
+          summand
+    addPolynomialcoeff r summand
+
+/-- Compute the vanishing polynomial on `xs` (coefficient form). -/
+def vanishingPolynomialcoeff (xs : Array Fr) : PolynomialCoeff :=
+  xs.foldl (init := #[Fr.one]) fun p x =>
+    multiplyPolynomialcoeff p #[-x, Fr.one]
+
+/-- Evaluate a coefficient-form polynomial at `z` using Horner's schema. -/
+def evaluatePolynomialcoeff
+    (polynomialCoeff : PolynomialCoeff) (z : Fr) : Fr :=
+  let n := polynomialCoeff.size
+  (Array.range n).foldl (init := Fr.zero) fun y i =>
+    y * z + polynomialCoeff[n - 1 - i]!
+
+/-- Convert evaluation form to coefficient form via inverse FFT. -/
+def polynomialEvalToCoeff (polynomial : Polynomial) : PolynomialCoeff :=
+  let roots := computeRootsOfUnity FIELD_ELEMENTS_PER_BLOB
+  fftField (bitReversalPermutation polynomial) roots (inv := true)
+
 
 /-! ## Blob <-> Polynomial -/
 
