@@ -1,5 +1,6 @@
 import EthCryptographySpecs.Bls.Pairing
 import EthCryptographySpecs.Proofs.Bls.FrZMod
+import EthCryptographySpecs.Proofs.Bls.G1Group
 
 /-!
 # Sufficiency of the ceremony pairing checks
@@ -94,6 +95,34 @@ structure SubgroupExponents
   g2_eq : ∀ i (hi : i < contribution.g2Powers.size),
     contribution.g2Powers[i]'hi = G2.mul G2.generator (b i)
 
+/-- Scalar multiplication by one gives the concrete G1 generator.
+
+This follows from the existing `G1.mulNat_def` unfolding theorem rather than
+being assumed by `ConcreteBlsLaws`. -/
+private theorem g1Mul_one : G1.mul G1.generator (1 : Fr) = G1.generator := by
+  change G1.mulNat G1.generator 1 = G1.generator
+  rw [G1.mulNat_def]
+  norm_num
+  rw [G1.mulNat_def]
+  norm_num
+  rfl
+
+/-- Unfolding equation for the executable G2 double-and-add multiplication. -/
+private theorem g2MulNat_def (p : G2) (k : Nat) :
+    G2.mulNat p k = if k = 0 then G2.zero
+      else if k % 2 = 1 then G2.add p (G2.mulNat (G2.double p) (k / 2))
+      else G2.mulNat (G2.double p) (k / 2) := by
+  rw [G2.mulNat]
+
+/-- Scalar multiplication by one gives the concrete G2 generator. -/
+private theorem g2Mul_one : G2.mul G2.generator (1 : Fr) = G2.generator := by
+  change G2.mulNat G2.generator 1 = G2.generator
+  rw [g2MulNat_def]
+  norm_num
+  rw [g2MulNat_def]
+  norm_num
+  rfl
+
 /-- The concrete BLS implementation laws required by the proof.
 
 Every field refers directly to this repository's `G1.mul`, `G2.mul`, `isInfinity`, and
@@ -101,12 +130,6 @@ Every field refers directly to this repository's `G1.mul`, `G2.mul`, `isInfinity
 implementation is the remaining cryptographic verification obligation; it is no longer
 hidden behind an unrelated abstract pairing type. -/
 structure ConcreteBlsLaws : Prop where
-  /-- Scalar multiplication by one gives the concrete G1 generator. -/
-  g1Mul_one : G1.mul G1.generator (1 : Fr) = G1.generator
-
-  /-- Scalar multiplication by one gives the concrete G2 generator. -/
-  g2Mul_one : G2.mul G2.generator (1 : Fr) = G2.generator
-
   /-- A generator multiple is non-infinity exactly when its scalar is nonzero. -/
   g1Mul_nonzero_iff : ∀ s : Fr,
     G1.isInfinity (G1.mul G1.generator s) = false ↔ s ≠ 0
@@ -159,7 +182,7 @@ theorem exponentChecksSufficient
         (G2.mul G2.generator exponents.x)
         (G1.mul G1.generator (exponents.a 1))
         (G2.mul G2.generator 1) := by
-      simpa only [laws.g2Mul_one] using h
+      simpa only [g2Mul_one] using h
     have hmul :=
       (laws.pairingEq_mul_iff exponents.s exponents.x (exponents.a 1) 1).mp h'
     exact hmul.trans (Fin.mul_one (exponents.a 1))
@@ -176,7 +199,7 @@ theorem exponentChecksSufficient
         (G2.mul G2.generator 1)
         (G1.mul G1.generator (exponents.a i))
         (G2.mul G2.generator (exponents.b 1)) := by
-      simpa only [laws.g2Mul_one] using h
+      simpa only [g2Mul_one] using h
     have hmul :=
       (laws.pairingEq_mul_iff
         (exponents.a (i + 1)) 1 (exponents.a i) (exponents.b 1)).mp h'
@@ -197,7 +220,7 @@ theorem exponentChecksSufficient
         (G2.mul G2.generator (exponents.b i))
         (G1.mul G1.generator (exponents.a i))
         (G2.mul G2.generator 1) := by
-      simpa only [laws.g1Mul_one, laws.g2Mul_one] using h
+      simpa only [g1Mul_one, g2Mul_one] using h
     have hmul :=
       (laws.pairingEq_mul_iff 1 (exponents.b i) (exponents.a i) 1).mp h'
     exact
